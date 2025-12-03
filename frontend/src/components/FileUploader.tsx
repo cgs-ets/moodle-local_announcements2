@@ -6,6 +6,7 @@ import { getConfig } from "../utils";
 import { FileData } from "../types/types";
 
 type Props = {
+  label?: string,
   desc: string,
   maxFiles: number,
   maxSize: number,
@@ -13,10 +14,11 @@ type Props = {
   existingfiles?: FileData[],
   setState: (value: string) => void
   showPreview?: boolean
+  mimeTypes?: string[]
 }
 
 
-export function FileUploader ({desc, maxFiles, maxSize, readOnly, existingfiles, setState, showPreview}: Props) {
+export function FileUploader ({label, desc, maxFiles, maxSize, readOnly, existingfiles, setState, showPreview, mimeTypes}: Props) {
   const openRef = useRef<() => void>(null);
   
   const [fileData, setFileData] = useState<FileData[]>([]);
@@ -36,6 +38,12 @@ export function FileUploader ({desc, maxFiles, maxSize, readOnly, existingfiles,
         return obj.serverfilename === file.serverfilename
       })
     })
+    
+    // Only update if there are actually new files to add
+    if (uniqueExisting.length === 0) {
+      return
+    }
+    
     const currPosition = fileData.length;
     const dressedExistingFiles = uniqueExisting.map((file: FileData, index: number) => {
       // Create a filedata obj for any newly added files.
@@ -51,12 +59,15 @@ export function FileUploader ({desc, maxFiles, maxSize, readOnly, existingfiles,
         existing: true,
         key: file.fileid,
         path: file.path,
+        fileid: file.fileid,
+        mimetype: file.mimetype || '',
       } as FileData;
     })
     // Append the dropped files to the fileData array.
     const allFileData = [...fileData, ...dressedExistingFiles]
     setFileData(allFileData)
-  }, [existingfiles])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [existingfiles?.map(f => f.serverfilename).join(',')])
 
   // Append dropped files.
   const handleDrop = (droppedFiles: File[]) => {
@@ -464,7 +475,7 @@ export function FileUploader ({desc, maxFiles, maxSize, readOnly, existingfiles,
   return (
     <>
       <Dropzone
-        accept={[IMAGE_MIME_TYPE, PDF_MIME_TYPE, MS_WORD_MIME_TYPE, MS_EXCEL_MIME_TYPE, MS_POWERPOINT_MIME_TYPE].flat()}
+        accept={mimeTypes ? mimeTypes.flat() : [IMAGE_MIME_TYPE, PDF_MIME_TYPE, MS_WORD_MIME_TYPE, MS_EXCEL_MIME_TYPE, MS_POWERPOINT_MIME_TYPE].flat()}
         onDrop={handleDrop}
         onReject={(files) => {
           setError(
@@ -510,7 +521,7 @@ export function FileUploader ({desc, maxFiles, maxSize, readOnly, existingfiles,
             </Dropzone.Idle>
           </Flex>
           <div className="flex flex-col gap-4 items-start">
-            <Button variant="primary" size="compact-md" radius="xl" onClick={() => openRef.current?.()}>Select file{maxFiles > 1 ? 's' : ''}</Button>
+            <Button variant="primary" size="compact-md" radius="xl" onClick={() => openRef.current?.()}>{label ? label : 'Select file'}{maxFiles > 1 ? 's' : ''}</Button>
             <Text c="dimmed" >{desc}</Text>
           </div>
           <div className="flex gap-2">

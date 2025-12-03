@@ -78,11 +78,7 @@ function BlockRenderer({ block }: { block: Block }) {
       const files = parseAttachments(block.attachments);
       
       if (files.length === 0) {
-        return (
-          <Box p="md" style={{ textAlign: 'center', color: '#999' }}>
-            <Text size="sm" c="dimmed">No file attached</Text>
-          </Box>
-        );
+        return null;
       }
       
       // For file blocks, we expect maxFiles=1, so take the first file

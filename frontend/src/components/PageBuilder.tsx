@@ -1,12 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Box, Button, ActionIcon, Menu, Textarea, Paper, Group, Text } from '@mantine/core';
-import { IconGripVertical, IconPlus, IconTrash, IconCode, IconTable, IconFile, IconEdit, IconChevronLeft, IconChevronRight, IconGripHorizontal, IconCopy, IconDotsVertical } from '@tabler/icons-react';
+import { IconGripVertical, IconPlus, IconTrash, IconCode, IconTable, IconFile, IconEdit, IconChevronLeft, IconChevronRight, IconGripHorizontal, IconCopy, IconDotsVertical, IconPhoto } from '@tabler/icons-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { RichTextEditor } from '@mantine/tiptap';
 import { useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { FileUploader } from './FileUploader';
-import { Row, Block, BlockType } from '../types/types';
+import { Row, Block, BlockType, FileData } from '../types/types';
+import { getConfig } from '../utils';
+import { IMAGE_MIME_TYPE } from '@mantine/dropzone';
 
 type PageBuilderProps = {
   rows: Row[];
@@ -15,6 +17,62 @@ type PageBuilderProps = {
 
 // Generate unique ID
 const generateId = () => `id-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+// Helper function to parse attachments string and convert to FileData objects
+const parseAttachmentsToFileData = (attachments: string | undefined): FileData[] => {
+  if (!attachments) return [];
+  
+  return attachments.split(',').map((entry, index) => {
+    let filename = '';
+    
+    if (entry.startsWith('NEW::')) {
+      filename = entry.replace('NEW::', '');
+    } else if (entry.startsWith('EXISTING::')) {
+      filename = entry.replace('EXISTING::', '');
+    } else {
+      return null;
+    }
+    
+    // Both NEW and EXISTING files are on the server, so treat as existing for display
+    const isExisting = true;
+    
+    // Build the file path/URL
+    const fileUrl = getConfig().wwwroot + '/local/announcements2/upload.php?view=1&fileid=' + encodeURIComponent(filename) + '&sesskey=' + getConfig().sesskey;
+    
+    // Determine mimetype from filename extension
+    const getMimeType = (filename: string): string => {
+      const ext = filename.toLowerCase().split('.').pop() || '';
+      const mimeTypes: Record<string, string> = {
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'gif': 'image/gif',
+        'webp': 'image/webp',
+        'svg': 'image/svg+xml',
+        'pdf': 'application/pdf',
+        'doc': 'application/msword',
+        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      };
+      return mimeTypes[ext] || 'application/octet-stream';
+    };
+    
+    return {
+      index: index,
+      displayname: filename,
+      file: null,
+      progress: 100,
+      started: true,
+      completed: true,
+      removed: false,
+      serverfilename: filename,
+      existing: isExisting,
+      key: filename,
+      fileid: filename,
+      path: fileUrl,
+      mimetype: getMimeType(filename),
+    } as FileData;
+  }).filter(Boolean) as FileData[];
+};
 
 // Block component
 type BlockComponentProps = {
@@ -62,6 +120,14 @@ function BlockComponent({
       }
     }
   }, [block.content, block.type, editor]);
+
+  // Memoize existing files to prevent recreating array on every render
+  const existingFiles = useMemo(() => {
+    if (block.type === 'file') {
+      return parseAttachmentsToFileData(block.attachments);
+    }
+    return [];
+  }, [block.type, block.attachments]);
 
   const renderBlockContent = () => {
     switch (block.type) {
@@ -121,14 +187,17 @@ function BlockComponent({
           </Box>
         );
       case 'file':
+        // Use memoized existingFiles
         return (
           <FileUploader
-            desc="Drag and drop image/file here..."
+            label="Upload image"
+            desc="Drag and drop image here..."
             maxFiles={1}
             maxSize={10}
-            existingfiles={[]}
+            existingfiles={existingFiles}
             setState={(value) => onUpdate(block.id, '', value)}
             showPreview={true}
+            mimeTypes={IMAGE_MIME_TYPE}
           />
         );
       default:
@@ -178,11 +247,11 @@ function BlockComponent({
               Table Builder
             </Menu.Item>
             <Menu.Item 
-              leftSection={<IconFile size={14} />}
+              leftSection={<IconPhoto size={14} />}
               onClick={() => onTypeChange(block.id, 'file')}
               disabled={block.type === 'file'}
             >
-              File Uploader
+              Image
             </Menu.Item>
             <Menu.Divider />
             <Menu.Label>Actions</Menu.Label>
@@ -451,7 +520,7 @@ function RowComponent({ row, rowIndex, onUpdate, onDelete, onAddRow, dragHandleP
               Table Builder
             </Menu.Item>
             <Menu.Item 
-              leftSection={<IconFile size={14} />}
+              leftSection={<IconPhoto size={14} />}
               onClick={() => {
                 const newBlock: Block = {
                   id: generateId(),
@@ -461,7 +530,7 @@ function RowComponent({ row, rowIndex, onUpdate, onDelete, onAddRow, dragHandleP
                 onUpdate(row.id, [...row.blocks, newBlock]);
               }}
             >
-              File Uploader
+              Image
             </Menu.Item>
           </Menu.Dropdown>
         </Menu>
@@ -470,6 +539,7 @@ function RowComponent({ row, rowIndex, onUpdate, onDelete, onAddRow, dragHandleP
           color="red"
           onClick={() => onDelete(row.id)}
           size="sm"
+          title="Delete Row"
         >
           <IconTrash size={16} />
         </ActionIcon>
@@ -578,14 +648,12 @@ export function PageBuilder({ rows, onChange }: PageBuilderProps) {
       )}
 
       {rows.length > 0 && (
-        <Box className="mt-0">
+        <Box className="mt-1">
           <Button
-            size="sm"
-            variant="subtle"
+            size="compact-sm"
+            variant="light"
             leftSection={<IconPlus size={14} />}
             onClick={handleAddRow}
-            fullWidth
-            radius={0}
           >
             Add Section
           </Button>

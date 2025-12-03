@@ -5,11 +5,10 @@ import '@mantine/tiptap/styles.css';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
 import 'dayjs/locale/en-gb';
-import { Post } from "./pages/Announcement/Post";
+import { Create } from "./pages/Announcement/Create";
 import { Edit } from "./pages/Announcement/Edit";
 import { List } from "./pages/List/List";
 import { Moderation } from "./pages/Moderation/Moderation";
-import { PostBuilder } from "./pages/Announcement/PostBuilder";
 
 
 
@@ -20,7 +19,7 @@ function App() {
       { path: "/", element: <List /> },
       { path: "/index.php", element: <List /> },
 
-      { path: "new", element: <PostBuilder /> },
+      { path: "new", element: <Create /> },
       { path: "moderation", element: <Moderation /> },
       { path: ":id", element: <Edit /> },
     ],

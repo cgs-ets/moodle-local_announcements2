@@ -33,6 +33,7 @@ export type Announcement = {
   attachments: string;
   existingattachments: FileData[];
   uploadedimages: string;
+  impersonate: User[];
 }
 
 export type FileData = {

@@ -2,71 +2,47 @@
 
 namespace local_announcements2\lib;
 
-require_once(__DIR__.'/../lib/activities.lib.php');
+require_once(__DIR__.'/../lib/announcements.lib.php');
 require_once(__DIR__.'/../lib/service.lib.php');
 require_once(__DIR__.'/../lib/utils.lib.php');
-require_once(__DIR__.'/../lib/recurrence.lib.php');
-require_once(__DIR__.'/../lib/risks.lib.php');
 
-use \local_announcements2\lib\activities_lib;
+use \local_announcements2\lib\announcements_lib;
 use \local_announcements2\lib\service_lib;
 use \local_announcements2\lib\utils_lib;
-use \local_announcements2\lib\recurrence_lib;
-use \local_announcements2\lib\risks_lib;
 
 defined('MOODLE_INTERNAL') || die();
 
 /**
- * Persistent model representing a single activity.
+ * Persistent model representing a single announcement.
  */
-class Activity {
+class Announcement {
 
-    /** Table to store this persistent model instances. */
-    const TABLE = 'activities';
+    const TABLE = 'ann2_posts';
     
     private $data = null;
 
     private const defaults = [
         'id' => 0,
-        'creator' => '',
-        'activityname' => '',
-        'idnumber' => '',
-        'campus' => 'senior',
-        'activitytype' => 'excursion',
-        'location' => '',
+        'authorusername' => '',
+        'mailed' => 0,
+        'notified' => 0,
+        'forcesend' => 0,
+        'subject' => '',
+        'message' => '',
+        'attachment' => 0,
+        'deleted' => 0,
         'timestart' => 0,
         'timeend' => 0,
-        'studentlistjson' => '',
-        'description' => '',
-        'transport' => '',
-        'cost' => '',
-        'status' => 0,
-        'permissions' => 0,
-        'permissionslimit' => 0,
-        'permissionsdueby' => 0,
-        'deleted' => 0,
-        'riskassessment' => '',
-        'attachments' => '',
+        'pinned' => 0,
+        'modrequired' => 0,
+        'modstatus' => 0,
+        'audiencesjson' => '',
+        'moderatorjson' => '',
+        'usermodified' => 0,
         'timecreated' => 0,
         'timemodified' => 0,
-        'staffincharge' => '',
-        'staffinchargejson' => '',
-        'planningstaffjson' => '',
-        'accompanyingstaffjson' => '',
-        'secondinchargejson' => '',
-        'otherparticipants' => '',
-        'absencesprocessed' => 0,
-        'remindersprocessed' => 0,
-        'categoriesjson' => '',
-        'colourcategory' => '',
-        'areasjson' => '',
-        'displaypublic' => 0,
-        'pushpublic' => 0,
-        'timesynclive' => 0,
-        'timesyncplanning' => 0,
-        'assessmentid' => 0,
-        'recurring' => 0,
-        'recurrence' => '',
+        'impersonate' => '',
+        'sorttime' => 0,
     ];
 
 
@@ -83,27 +59,6 @@ class Activity {
         if ($id > 0) {
             return $this->read($id, $includeDeleted);
         }
-    }
-
-    /**
-     * Decorate the model for calendar. Minimal for performance.
-     *
-     * @return array
-     */
-    public function export_minimal() {
-        global $USER;
-
-        if (!$this->get('id')) {
-            return (object) static::defaults;
-        }
-
-        $data = clone($this->data);
-        $other = $this->get_other_values_minimal();
-        $merged = (object) array_merge((array) $data, (array) $other);
-        if ($merged->statushelper->isapproved) {
-            $merged->stepname = '';
-        }
-        return $merged;
     }
 
     /**
@@ -144,144 +99,6 @@ class Activity {
         }
 
         return $merged;
-    }
-    
-    /**
-     * Load related assistant records 
-     *
-     * @return void
-     */
-    public function load_planningstaffdata() {
-        global $DB;
-
-        if (empty($this->get('id'))) {
-            return [];
-        }
-
-        $sql = "SELECT *
-                  FROM {activities_staff}
-                 WHERE activityid = ?
-                   AND usertype = 'planning'";
-        $params = array($this->get('id'));
-        $records = $DB->get_records_sql($sql, $params);
-
-        $assistants = array();
-        foreach($records as $rec) {
-            $assistant = \local_announcements2\utils_lib::user_stub($rec->username);
-            if (empty($assistant)) {
-                continue;
-            }
-            $assistants[] = $assistant;
-        }
-
-        $this->set('plannerdata', json_encode($assistants));
-    }
-
-    /**
-     * Load related coaches records
-     *
-     * @return void
-     */
-    public function load_accompanyingstaffdata() {
-        global $DB;
-
-        if (empty($this->get('id'))) {
-            return [];
-        }
-
-        $sql = "SELECT *
-                  FROM {activities_staff}
-                 WHERE activityid = ?
-                   AND usertype = 'accompanying'";
-        $params = array($this->get('id'));
-        $records = $DB->get_records_sql($sql, $params);
-
-        $coaches = array();
-        foreach($records as $rec) {
-            $coach = \local_announcements2\lib\utils_lib::user_stub($rec->username);
-            if (empty($coach)) {
-                continue;
-            }
-            $coaches[] = $coach;
-        }
-
-        $this->set('accompanyingdata', json_encode($coaches));
-    }
-
-    /**
-     * Load related student recods.
-     *
-     * @return void
-     */
-    public function load_studentsdata($withpermissions = false) {
-        global $DB;
-
-        if (empty($this->get('id'))) {
-            return [];
-        }
-
-        $sql = "SELECT *
-                FROM {activities_students}
-                WHERE activityid = ?";
-        $params = array($this->get('id'));
-        $records = $DB->get_records_sql($sql, $params);
-
-        $students = array();
-        foreach($records as $rec) {
-            $student = utils_lib::student_stub($rec->username);
-            if (!$student) {
-                continue;
-            }
-            $student->permission = -1;
-            $student->parents = [];
-            $students[] = $student;
-        }
-        //var_export($students); exit;
-
-        // Get permissions.
-        if ($withpermissions) {
-            // Process students and attach permissions.
-            $permissions = $this->get_permissions();
-            foreach ($students as &$student) {
-                // Determine whether student is allowed based on permissions.
-                if (isset($permissions[$student->un])) {
-                    $student->permission = max(array_column($permissions[$student->un], "response"));
-                    $student->parents = $permissions[$student->un];
-                }
-            }
-        }
-
-        // Sort by last name.
-        usort($students, function($a, $b) {
-            return strcmp(strtolower($a->ln), strtolower($b->ln));
-        });
-
-        $this->set('studentsdata', json_encode($students));
-    }
-
-    public function get_permissions() {
-        global $DB;
-
-        if (empty($this->get('id'))) {
-            return [];
-        }
-
-        $sql = "SELECT *
-                FROM {activities_permissions}
-                WHERE activityid = ?";
-        $params = array($this->get('id'));
-        $records = $DB->get_records_sql($sql, $params);
-
-        $permissions = array();
-        foreach ($records as $rec) {
-            if (!isset($permissions[$rec->studentusername])) {
-                $permissions[$rec->studentusername] = array();
-            }
-            $parent = utils_lib::user_stub($rec->parentusername);
-            $parent->response = $rec->response;
-            $permissions[$rec->studentusername][] = $parent;
-        }
-        return $permissions;
     }
 
     /**
@@ -371,33 +188,6 @@ class Activity {
                 $filenameParts = explode('__', $file->get_filename()); // Store result in a variable
                 $displayname = array_pop($filenameParts); // Now array_pop can safely operate on the variable
                 $path = file_encode_url($CFG->wwwroot.'/pluginfile.php', '/1/local_announcements2/'.$area.'/'.$id.'/'.$file->get_filename());
-                $out[] = [
-                    'displayname' => $displayname,
-                    'fileid' => $file->get_id(),
-                    'serverfilename' => $file->get_filename(),
-                    'mimetype' => $file->get_mimetype(),
-                    'path' => $path,
-                    'existing' => true,
-                ];
-            }
-        }
-        
-        return $out;
-    }
-
-
-    public function export_old_files($area, $id) {
-        global $CFG;
-
-        $out = [];
-        $fs = get_file_storage();
-	    $files = $fs->get_area_files(1, 'local_excursions', $area, $id, "filename", false);
-        //var_export($files); exit;
-        if ($files) {
-            foreach ($files as $file) {
-                $filenameParts = explode('__', $file->get_filename()); // Store result in a variable
-                $displayname = array_pop($filenameParts); // Now array_pop can safely operate on the variable
-                $path = file_encode_url($CFG->wwwroot.'/pluginfile.php', '/1/local_excursions/'.$area.'/'.$id.'/'.$file->get_filename());
                 $out[] = [
                     'displayname' => $displayname,
                     'fileid' => $file->get_id(),
@@ -677,26 +467,5 @@ class Activity {
 	    ];
     }
 
-
-    /**
-     * Get the additional values to inject while exporting.
-     *
-     * @return array Keys are the property names, values are their values.
-     */
-    protected function get_other_values_minimal() {
-        global $USER, $DB;
-        
-        $statushelper = activities_lib::status_helper($this->data->status);
-
-        $creatordata = utils_lib::user_stub($this->data->creator);
-        $staffincharge = json_decode($this->data->staffinchargejson);
-
-    	return [
-            'statushelper' => $statushelper,
-            'creatordata' => $creatordata,
-            'creatorsortname' => $creatordata->ln . ', ' . $creatordata->fn,
-            'staffinchargesortname' => $staffincharge ? $staffincharge->ln . ', ' . $staffincharge->fn : '',
-	    ];
-    }
 
 }
