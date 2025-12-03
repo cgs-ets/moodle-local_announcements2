@@ -1,0 +1,10 @@
+{
+  "require": {
+      "guzzlehttp/guzzle": "^7.7",
+      "microsoft/microsoft-graph": "^1.103",
+    "dompdf/dompdf": "^3.1",
+    "d4h/finediff": "^1.0",
+    "caxy/php-htmldiff": "^0.1.17",
+    "phpoffice/phpspreadsheet": "^5.1"
+  }
+}

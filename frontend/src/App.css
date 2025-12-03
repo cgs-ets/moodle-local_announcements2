@@ -1,0 +1,134 @@
+/* if you have any mantine imports, you can include that here as well */
+@import "@mantine/core/styles.css";
+@import "@mantine/dates/styles.css";
+
+@layer tailwind {
+  @tailwind base;
+}
+@tailwind components;
+@tailwind utilities;
+
+a {
+  text-decoration: none;
+}
+
+body { 
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, San Francisco, Segoe UI, Roboto, Helvetica Neue, sans-serif; 
+}
+@supports (font-variation-settings: normal) {
+  body { 
+    font-family: 'Inter var', -apple-system, BlinkMacSystemFont, San Francisco, Segoe UI, Roboto, Helvetica Neue, sans-serif; 
+    font-feature-settings: "cv03", "cv04", "cv11";
+  }
+}
+
+/*.readonly input {
+  background-color: rgb(243 244 246);
+}*/
+
+body {
+  background-color: #f1f5f9 !important;
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.4285714286;
+  color: #1d273b;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+.page-header {
+  margin: 1.25rem 0 0;
+}
+.page-pretitle {
+  font-size: .625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  line-height: 1rem;
+  color: #616876;
+}
+.page-title {
+  margin: 0;
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+  font-weight: 600;
+  color: inherit;
+  display: flex;
+  align-items: center;
+}
+
+/* TinyMCE Editor Styling */
+.tox-tinymce {
+  border-radius: 0.375rem;
+  border: 1px solid #dee2e6;
+}
+
+.tox .tox-edit-area__iframe {
+  background-color: #ffffff;
+}
+
+/* Table styling for TinyMCE */
+.tox .tox-edit-area__iframe body table,
+.mce-content-body table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  margin: 1rem 0;
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
+}
+
+.tox .tox-edit-area__iframe body table td,
+.tox .tox-edit-area__iframe body table th,
+.mce-content-body table td,
+.mce-content-body table th {
+  min-width: 1em;
+  border: 1px solid #dee2e6;
+  padding: 0.5rem 0.75rem;
+  vertical-align: top;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.tox .tox-edit-area__iframe body table th,
+.mce-content-body table th {
+  font-weight: 600;
+  text-align: left;
+  background-color: #f8f9fa;
+  color: #212529;
+}
+
+.tox .tox-edit-area__iframe body table td,
+.mce-content-body table td {
+  background-color: #ffffff;
+}
+
+.tox .tox-edit-area__iframe body table p,
+.mce-content-body table p {
+  margin: 0;
+}
+
+.tox .tox-edit-area__iframe body table p + p,
+.mce-content-body table p + p {
+  margin-top: 0.5rem;
+}
+
+/* Table row hover effect */
+.tox .tox-edit-area__iframe body table tbody tr:hover,
+.mce-content-body table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+/* Table header styling */
+.tox .tox-edit-area__iframe body table thead,
+.mce-content-body table thead {
+  background-color: #f8f9fa;
+}
+
+.tox .tox-edit-area__iframe body table thead th,
+.mce-content-body table thead th {
+  border-bottom: 2px solid #dee2e6;
+  font-weight: 600;
+}
+
+
