@@ -9,7 +9,9 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 require_once(__DIR__.'/announcements.api.php');
+require_once(__DIR__.'/utils.api.php');
 
 class API {
     use \local_announcements2\api\announcements_api;
+    use \local_announcements2\api\utils_api;
 }

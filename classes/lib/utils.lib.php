@@ -269,6 +269,41 @@ class utils_lib {
     }
 
 
+    /**
+     * Search users.
+     *
+     * @param string $query
+     * @return array results
+     */
+    public static function search_users($query) {
+        global $DB;
+
+        $sql = "SELECT DISTINCT u.*, d.*
+                FROM mdl_user u
+                JOIN mdl_user_info_data d ON u.id = d.userid
+                WHERE u.suspended = 0
+                AND (
+                    LOWER(REPLACE(u.firstname, '''', '')) LIKE ?
+                    OR LOWER(REPLACE(u.lastname, '''', '')) LIKE ?
+                    OR LOWER(REPLACE(u.username, '''', '')) LIKE ?
+                )";
+
+        // remove apostrophes
+        $likesearch = "%" . strtolower(str_replace("'", "", $query)) . "%";
+        $data = $DB->get_records_sql($sql, [$likesearch, $likesearch, $likesearch]);
+        
+        $first10Elements = array_slice($data, 0, 10);
+
+        $users = [];
+        foreach ($first10Elements as $row) {
+            $users[] = static::user_stub($row->username);
+        }
+        return $users;
+    }
+
+    
+
+
     
 
 }

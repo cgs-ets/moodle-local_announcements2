@@ -27,6 +27,7 @@ export type Announcement = {
   timecreated: string;
   timemodified: string;
   timestart: string;
+  endenabled: boolean;
   timeend: string;
   deleted: boolean;
   forcesend: boolean;
@@ -34,6 +35,7 @@ export type Announcement = {
   existingattachments: FileData[];
   uploadedimages: string;
   impersonate: User[];
+  audiences: Audience[];
 }
 
 export type FileData = {
@@ -83,4 +85,30 @@ export type Block = {
 export type Row = {
   id: string;
   blocks: Block[];
+}
+
+export type Errors = {
+  submit?: string;
+  subject?: string;
+  message?: string;
+  timecreated?: string;
+  timemodified?: string;
+  timestart?: string;
+  endenabled?: string;
+  timeend?: string;
+  deleted?: string;
+  forcesend?: string;
+  attachments?: string;
+  existingattachments?: string;
+  uploadedimages?: string;
+  impersonate?: string;
+  audiences?: string;
+}
+
+export type Audience = {
+  id: string,
+  label: string,
+  roles?: string[],
+  items?: Audience[],
+  children?: Audience[],
 }

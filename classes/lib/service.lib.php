@@ -10,17 +10,8 @@ use \stdClass;
 
 class service_lib {
 
-    const PUBLIC_FUNCTIONS  = [
-        'get_public_calendar',
-        'search_public',
-        'get_public_activity',
-    ];
-
     const PARENT_FUNCTIONS  = [
         'check_login',
-        'get_activity_with_permission',
-        'submit_permission',
-        'get_my_involvement',
     ];
 
     /*
@@ -72,7 +63,7 @@ class service_lib {
             $function = static::service_function_info($function);
 
             // White list parent functions. For all other purposes, this is staff system.
-            if (!in_array($function->methodname, static::PARENT_FUNCTIONS) && !in_array($function->methodname, static::PUBLIC_FUNCTIONS)) {
+            if (!in_array($function->methodname, static::PARENT_FUNCTIONS)) {
                 utils_lib::require_staff();
             }
     

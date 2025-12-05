@@ -7,14 +7,14 @@ import { Footer } from "../../components/Footer";
 import { getConfig } from "../../utils";
 import useFetch from "../../hooks/useFetch";
 import { FileUploader } from "../../components/FileUploader";
-import { Announcement, Row, User } from "../../types/types";
+import { Announcement, Errors, Row, User, Audience } from "../../types/types";
 import { PageBuilder } from "../../components/PageBuilder";
 import { IconEye, IconSend } from "@tabler/icons-react";
 import { PagePreview } from "../../components/PagePreview";
-import { StaffSelector } from "../../components/StaffSelector";
 import { UserCombobox } from "../../components/UserCombobox";
 import { DateTimePicker } from "@mui/x-date-pickers";
 import dayjs from "dayjs";
+import { AudienceSelector } from "../../components/AudienceSelector";
 
 
 // Generate unique ID
@@ -22,7 +22,7 @@ const generateId = () => `id-${Date.now()}-${Math.random().toString(36).substr(2
 
 export function Create() {
   const api = useFetch();
-  const [errors, setErrors] = useState({})
+  const [errors, setErrors] = useState<Errors>({} as Errors)
   const [data, setData] = useState<Announcement>({
     id: 0,
     username: "",
@@ -30,16 +30,19 @@ export function Create() {
     message: "",
     timecreated: "",
     timemodified: "",
-    timestart: "",
-    timeend: "",
+    timestart: dayjs().unix().toString(),
+    endenabled: false,
+    timeend: dayjs().unix().toString(),
     deleted: false,
     forcesend: false,
     attachments: "",
     existingattachments: [],
     uploadedimages: "",
     impersonate: [] as User[],
+    audiences: [] as Audience[],
   })
   const [sendAsOptions, setSendAsOptions] = useState<User[]>([])
+  const [audiences, setAudiences] = useState<Audience[]>([])
   // Initialize page builder with a single row and single block
   const [pageBuilderRows, setPageBuilderRows] = useState<Row[]>([
     {
@@ -56,24 +59,43 @@ export function Create() {
   document.title = 'Post Announcement'
 
   useEffect(() => {
-    getSendAsOptions()
+    loadData()
   }, []);
+
+  const loadData = async () => {
+    const [sendAsOptionsResponse, audiencesResponse] = await Promise.all([
+      getSendAsOptions(),
+      getAudiences()
+    ]);
+    if (sendAsOptionsResponse.error) {
+      return
+    }
+    if (audiencesResponse.error) {
+      return
+    }
+    setSendAsOptions(sendAsOptionsResponse.data)
+    setAudiences(audiencesResponse.data)
+  }
   
   const getSendAsOptions = async () => {
-    const fetchResponse = await api.call({
+    return await api.call({
       query: {
         methodname: 'local_announcements2-get_sendas_options'
       }
     })
-    if (fetchResponse.error) {
-      return
-    }
-    setSendAsOptions(fetchResponse.data)
+  }
+
+  const getAudiences = async () => {
+    return await api.call({
+      query: {
+        methodname: 'local_announcements2-get_audiences'
+      }
+    })
   }
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setError("")
+    setErrors({} as Errors)
 
     // Serialize page builder rows to JSON string for storage in message field
     const serializedRows = JSON.stringify(pageBuilderRows);
@@ -94,7 +116,7 @@ export function Create() {
     })
 
     if (response.error) {
-      setError(response.exception?.message ?? "Error submitting form")
+      setErrors({submit: response.exception?.message ?? "Error submitting form"})
       return
     }
 
@@ -124,11 +146,11 @@ export function Create() {
       <Header />
       <div style={{minHeight: 'calc(100vh - 154px)'}}>
 
-        { error.length 
+        { errors.submit && errors.submit.length > 0 
           ? <Container size="xl">
               <Center h={300}>
                 <Text fw={600} fz="lg">Failed to post announcement...</Text>
-                <Text c="red" mt="md">{error}</Text>
+                <Text c="red" mt="md">{errors.submit}</Text>
               </Center>
             </Container> 
           : <>
@@ -148,12 +170,12 @@ export function Create() {
                 <form noValidate onSubmit={handleSubmit}>
 
                 <Grid grow>
-                <Grid.Col span={{ base: 12, lg: 9 }}>
+                <Grid.Col span={{ base: 12, lg: 12 }}>
                   <Box className="flex flex-col gap-4 relative ps-7 pe-7">
 
                 
                     <div>
-                      <Text fz="sm" fw={500} c="#212529" mb="xs">Subject</Text>
+                      <Text fz="md" fw={500} c="#212529" mb="xs">Subject</Text>
                       <TextInput
                         value={data.subject}
                         onChange={(e) => setData({...data, subject: e.target.value})}
@@ -162,17 +184,24 @@ export function Create() {
 
                     <div>
                       <Group justify="space-between" className="mb-1">
-                        <Text fz="sm" fw={500} c="#212529">Message</Text>
-                        
+                        <Text fz="md" fw={500} c="#212529">Compose message</Text>
+                        <Button variant="light" size="compact-sm"  leftSection={<IconEye size={16} />} onClick={() => setPreview(true)}>
+                          Preview
+                        </Button>
                       </Group>
-                      <PageBuilder 
-                        rows={pageBuilderRows} 
-                        onChange={setPageBuilderRows}
-                      />
+
+                      <div className="p-6 pr-10 bg-gray-50 border rounded-sm">
+                        <div className="max-w-[760px] mx-auto">
+                          <PageBuilder 
+                            rows={pageBuilderRows} 
+                            onChange={setPageBuilderRows}
+                          />
+                        </div>
+                      </div>
                     </div>
 
                     <div>
-                      <Text fz="sm" fw={500} c="#212529" mb="xs">Attachments</Text>
+                      <Text fz="md" fw={500} c="#212529" mb="xs">Attachments</Text>
                       <div className="border">
                         <FileUploader 
                           desc={`Drag and drop files here...`} 
@@ -185,93 +214,124 @@ export function Create() {
                     </div>
 
 
+                    <div>
+                      <Text fz="md" fw={500} c="#212529" mb="xs">Audiences</Text>
+                      <div>
+                        {api.state.loading ? (
+                          <Text fz="sm" c="dimmed">Loading audiences...</Text>
+                        ) : Object.keys(audiences).length > 0 ? (
+                          <AudienceSelector
+                            options={audiences}
+                              onChange={(value) => setData({...data, audiences: value})}
+                              value={data.audiences}
+                            />
+                        ) : null}
+                      </div>
+                    </div>
+
                 
 
 
 
                   </Box>
                   </Grid.Col>
-                  <Grid.Col span={{ base: 12, lg: 3 }}>
+                  <Grid.Col span={{ base: 12, lg: 12 }}>
 
-                    <div className="flex flex-col gap-4">
-                      { sendAsOptions.length > 0 && ( 
-                          <UserCombobox
-                            value={data.impersonate && data.impersonate.length > 0 ? data.impersonate[0] : null}
-                            onChange={(value) => setData({...data, impersonate: value ? [value] : []})}
-                            options={sendAsOptions}
-                            label="Send as"
-                            description="Send as another user or leave blank to send as yourself"
-                            placeholder="Select user..."
+                    <div className="ps-7 pe-7">
+
+                      <Text fz="md" fw={500} c="#212529" className="mb-2">Display settings</Text>
+
+                      <div className="flex flex-col gap-4 bg-white p-4 rounded-md border">
+
+
+                        { sendAsOptions.length > 0 && ( 
+                            <UserCombobox
+                              value={data.impersonate && data.impersonate.length > 0 ? data.impersonate[0] : null}
+                              onChange={(value) => setData({...data, impersonate: value ? [value] : []})}
+                              options={sendAsOptions}
+                              label="Send as"
+                              description="Send as another user or leave blank to send as yourself"
+                              placeholder="Select user..."
+                            />
+                        )}
+
+
+
+                        <div>
+                          <Text fz="sm" mb="5px" fw={500} c="#212529">Display start</Text>
+                          <DateTimePicker
+                            value={dayjs.unix(Number(data.timestart))}
+                            onChange={(newValue) => updateField('timestart', (newValue?.unix() ?? 0).toString())}
+                            views={['day', 'month', 'year', 'hours', 'minutes']}
+                            slotProps={{
+                              textField: {
+                                error: !!errors.timestart,
+                              },
+                            }}
                           />
-                      )}
+                        </div>
 
-                      <div>
-                        <Text fz="sm" fw={500} c="#212529">Send immediately</Text>
-                        <Checkbox
-                          label="Send a copy of this announcement immediately. This should only be used for emergencies."
-                          checked={data.forcesend}
-                          onChange={(e) => setData({...data, forcesend: e.target.checked})}
-                          c="red"
-                        />
+
+                        <div>
+                          <Text fz="sm" mb="5px" fw={500} c="#212529">Display end</Text>
+                          <Checkbox
+                            label="Enable"
+                            checked={data.endenabled}
+                            onChange={(e) => setData({...data, endenabled: e.target.checked})}
+                            className="mb-1"
+                          />
+                          {data.endenabled && (
+                          <DateTimePicker 
+                            value={dayjs.unix(Number(data.timeend))}
+                            onChange={(newValue) => {
+                              updateField('timeend', (newValue?.unix() ?? 0).toString());
+                            }}
+                            views={['day', 'month', 'year', 'hours', 'minutes']}
+                            slotProps={{
+                              textField: {
+                                error: !!errors.timeend,
+                                },
+                              }}
+                            />
+                          )}
+                        </div>
+
+                        
+                        <div>
+                          <Text fz="sm" fw={500} c="#212529" className="mb-1">Send immediately</Text>
+                          <Checkbox
+                            label="Send a copy of this announcement immediately. This should only be used for emergencies."
+                            checked={data.forcesend}
+                            onChange={(e) => setData({...data, forcesend: e.target.checked})}
+                            c="red"
+                          />
+                        </div>
+
+
+                        
+
+
                       </div>
 
 
-                      <div>
-                        <Text fz="sm" mb="5px" fw={500} c="#212529">Start time</Text>
-                        <DateTimePicker
-                          value={dayjs.unix(Number(data.timestart))}
-                          onChange={(newValue) => updateField('timestart', (newValue?.unix() ?? 0).toString())}
-                          views={['day', 'month', 'year', 'hours', 'minutes']}
-                          slotProps={{
-                            textField: {
-                              error: !!errors.timestart,
-                            },
-                          }}
-                          readOnly={viewStateProps.readOnly}
-                        />
-                      </div>
-                      <div>
-                        <Text fz="sm" mb="5px" fw={500} c="#212529">End time</Text>
-                        <DateTimePicker 
-                          value={dayjs.unix(Number(formData.timeend))}
-                          onChange={(newValue) => {
-                            manuallyEdited.current = true;
-                            updateField('timeend', (newValue?.unix() ?? 0).toString());
-                          }}
-                          views={['day', 'month', 'year', 'hours', 'minutes']}
-                          slotProps={{
-                            textField: {
-                              error: !!errors.timestart,
-                            },
-                          }}
-                          readOnly={viewStateProps.readOnly}
-                        />
+                      <div className="flex gap-2 mt-4">
+                        <Button 
+                          type="submit"
+                          variant="primary"
+                          size="compact-md"
+                          leftSection={<IconSend size={14} />}
+                        >
+                          Post
+                        </Button>
                       </div>
 
-                      
-                    
 
-
-                    Availability dates...
-                    Save draft / Publish buttons...
-
-                    
                     </div>
 
-                    <div className="flex gap-2">
-                      <Button variant="light" size="compact-md" leftSection={<IconEye size={14} />} onClick={() => setPreview(true)}>
-                        Preview
-                      </Button>
-                      <Button 
-                        type="submit"
-                        variant="primary"
-                        size="compact-md"
-                        leftSection={<IconSend size={14} />}
-                      >
-                        Post
-                      </Button>
-                    </div>
+                   
+                    
                   </Grid.Col>
+                  
                   </Grid>
                 </form>
               </Container>
@@ -282,7 +342,7 @@ export function Create() {
       <Footer />
 
       {preview && (
-        <Modal opened={preview} onClose={() => setPreview(false)} title="Preview" size="700px">
+        <Modal opened={preview} onClose={() => setPreview(false)} title="Preview" size="760px">
           <Text fz="lg" fw={500} c="#212529">{data.subject}</Text>
           <PagePreview rows={pageBuilderRows} />
         </Modal>

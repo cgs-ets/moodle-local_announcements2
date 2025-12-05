@@ -52,16 +52,22 @@ function BlockRenderer({ block }: { block: Block }) {
       return (
         <div 
           dangerouslySetInnerHTML={{ __html: block.content || '' }}
-          style={{ padding: '16px' }}
+          style={{ 
+            padding: '16px',
+            wordBreak: 'break-word',
+            overflowWrap: 'break-word',
+            overflow: 'hidden'
+          }}
         />
       );
     
     case 'code':
       // Render code block with monospace font
       return (
-        <Box p="md" style={{ fontFamily: 'monospace', whiteSpace: 'pre-wrap', backgroundColor: '#f5f5f5' }}>
-          <Text size="sm">{block.content || ''}</Text>
-        </Box>
+        <div 
+          dangerouslySetInnerHTML={{ __html: block.content || '' }} 
+          style={{ padding: '16px' }} 
+        />
       );
     
     case 'table':

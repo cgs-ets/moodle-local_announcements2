@@ -1,12 +1,11 @@
 import { useParams } from "react-router-dom";
 import useFetch from "../../hooks/useFetch";
 import { useEffect, useState } from "react";
-import { Form } from "../../stores/formStore";
 
 export function Preview() {
   let { id } = useParams();
   const api = useFetch()
-  const [activity, setActivity] = useState<Form | null>(null)
+  const [activity, setActivity] = useState(null)
 
   useEffect(() => {
     document.title = 'Activity Preview';

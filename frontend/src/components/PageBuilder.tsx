@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Box, Button, ActionIcon, Menu, Textarea, Paper, Group, Text } from '@mantine/core';
-import { IconGripVertical, IconPlus, IconTrash, IconCode, IconTable, IconFile, IconEdit, IconChevronLeft, IconChevronRight, IconGripHorizontal, IconCopy, IconDotsVertical, IconPhoto } from '@tabler/icons-react';
+import { Box, Button, ActionIcon, Menu, Textarea, Paper, Group, Text, Tabs } from '@mantine/core';
+import { IconGripVertical, IconPlus, IconTrash, IconCode, IconTable, IconFile, IconEdit, IconChevronLeft, IconChevronRight, IconGripHorizontal, IconCopy, IconDotsVertical, IconPhoto, IconColumnInsertRight, IconRowInsertBottom } from '@tabler/icons-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { RichTextEditor } from '@mantine/tiptap';
 import { useEditor } from '@tiptap/react';
@@ -87,6 +87,7 @@ type BlockComponentProps = {
   dragHandleProps?: any;
   onCopy?: (block: Block) => void;
   hasCopiedBlock?: boolean;
+  totalBlocks: number;
 }
 
 function BlockComponent({ 
@@ -98,7 +99,8 @@ function BlockComponent({
   onTypeChange,
   dragHandleProps,
   onCopy,
-  hasCopiedBlock = false
+  hasCopiedBlock = false,
+  totalBlocks
 }: BlockComponentProps) {
   const editor = useEditor({
     extensions: [StarterKit],
@@ -137,7 +139,7 @@ function BlockComponent({
         }
         return (
           <RichTextEditor editor={editor} className="!rounded-none !border-none">
-            <RichTextEditor.Toolbar sticky stickyOffset={60} className="!border-none !rounded-none !pb-0 !pr-16 !m-0">
+            <RichTextEditor.Toolbar className="!border-none !rounded-none !pb-0 !pr-16 !m-0">
               <RichTextEditor.ControlsGroup>
                 <RichTextEditor.Bold />
                 <RichTextEditor.Italic />
@@ -156,24 +158,45 @@ function BlockComponent({
                 <RichTextEditor.Unlink />
               </RichTextEditor.ControlsGroup>
             </RichTextEditor.Toolbar>
-            <RichTextEditor.Content style={{ cursor: 'text' }} />
+            <RichTextEditor.Content 
+              style={{ 
+                cursor: 'text',
+                wordBreak: 'break-word',
+                overflowWrap: 'break-word',
+                overflow: 'hidden'
+              }} 
+            />
           </RichTextEditor>
         );
       case 'code':
         return (
-          <Textarea
-            value={block.content}
-            onChange={(e) => onUpdate(block.id, e.target.value)}
-            placeholder="Enter code here..."
-            autosize
-            minRows={4}
-            styles={{
-              input: {
-                fontFamily: 'monospace',
-                border: 'none',
-              },
-            }}
-          />
+          <Tabs defaultValue="edit">
+            <Tabs.List className='pt-1'>
+              <Tabs.Tab value="edit">Edit</Tabs.Tab>
+              <Tabs.Tab value="preview">Preview</Tabs.Tab>
+            </Tabs.List>
+            <Tabs.Panel value="edit">
+              <Textarea
+                value={block.content}
+                onChange={(e) => onUpdate(block.id, e.target.value)}
+                placeholder="Enter code here..."
+                autosize
+                minRows={4}
+                styles={{
+                  input: {
+                    fontFamily: 'monospace',
+                    border: 'none',
+                  },
+                }}
+              />
+            </Tabs.Panel>
+            <Tabs.Panel value="preview">
+              <div 
+                dangerouslySetInnerHTML={{ __html: block.content || '' }} 
+                style={{ padding: '16px' }} 
+              />
+            </Tabs.Panel>
+          </Tabs>
         );
       case 'table':
         return (
@@ -214,7 +237,8 @@ function BlockComponent({
         style={{ position: 'absolute', top: 8, right: 8, zIndex: 10 }}
         className="bg-white/50 backdrop-blur-sm rounded-md"
       >
-        <ActionIcon variant="subtle" {...dragHandleProps}>
+  
+        <ActionIcon variant="subtle" {...dragHandleProps} className={totalBlocks > 1 ? 'opacity-100' : 'opacity-0 hidden'}>
           <IconGripHorizontal size={20} style={{ cursor: 'grab', color: '#999' }} />
         </ActionIcon>
         <Menu shadow="md" width={200}>
@@ -286,7 +310,7 @@ function BlockComponent({
           </Menu.Dropdown>
         </Menu>
       </Group>
-      <div>
+      <div className='border-b'>
         {renderBlockContent()}
       </div>
     </div>
@@ -304,9 +328,10 @@ type RowComponentProps = {
   copiedBlock: Block | null;
   onCopy: (block: Block) => void;
   onClearCopy: () => void;
+  totalRows: number;
 }
 
-function RowComponent({ row, rowIndex, onUpdate, onDelete, onAddRow, dragHandleProps, copiedBlock, onCopy, onClearCopy }: RowComponentProps) {
+function RowComponent({ row, rowIndex, onUpdate, onDelete, onAddRow, dragHandleProps, copiedBlock, onCopy, onClearCopy, totalRows }: RowComponentProps) {
   const handleBlockUpdate = (blockId: string, content: string, attachments?: string) => {
     const updatedBlocks = row.blocks.map(block => 
       block.id === blockId 
@@ -407,14 +432,16 @@ function RowComponent({ row, rowIndex, onUpdate, onDelete, onAddRow, dragHandleP
   };
 
   return (
-    <div className="flex gap-2 items-start -mt-[1px] -ml-7 -mr-8">
+    <div className={`flex gap-2 items-start -mt-[1px] -ml-7 -mr-8`}>
       {/* Left side: Drag handle */}
       <div 
         style={{ display: 'flex', alignItems: 'center', paddingTop: '8px' }}
         {...dragHandleProps}
+        className={totalRows > 1 ? 'opacity-100' : 'opacity-0 hidden'}
       >
         <IconGripVertical size={20} style={{ cursor: 'grab', color: '#999' }} />
       </div>
+  
       
       {/* Middle: Blocks */}
       <div style={{ flex: 1 }}>
@@ -440,7 +467,7 @@ function RowComponent({ row, rowIndex, onUpdate, onDelete, onAddRow, dragHandleP
                           ...provided.draggableProps.style,
                           opacity: snapshot.isDragging ? 0.8 : 1,
                         }}
-                        className="border bg-gray-50 -ml-[1px]"
+                        className="border-t border-l border-r bg-gray-50 -ml-[1px]"
                       >
                         <BlockComponent
                           block={block}
@@ -454,6 +481,7 @@ function RowComponent({ row, rowIndex, onUpdate, onDelete, onAddRow, dragHandleP
                           dragHandleProps={provided.dragHandleProps}
                           onCopy={onCopy}
                           hasCopiedBlock={!!copiedBlock}
+                          totalBlocks={row.blocks.length}
                         />
                       </div>
                     )}
@@ -475,7 +503,7 @@ function RowComponent({ row, rowIndex, onUpdate, onDelete, onAddRow, dragHandleP
               size="sm"
               title="Add Block"
             >
-              <IconPlus size={16} />
+              <IconColumnInsertRight size={16} />
             </ActionIcon>
           </Menu.Target>
           <Menu.Dropdown>
@@ -627,6 +655,7 @@ export function PageBuilder({ rows, onChange }: PageBuilderProps) {
                         copiedBlock={copiedBlock}
                         onCopy={handleCopyBlock}
                         onClearCopy={handleClearCopy}
+                        totalRows={rows.length}
                       />
                     </div>
                   )}
@@ -641,18 +670,18 @@ export function PageBuilder({ rows, onChange }: PageBuilderProps) {
       {rows.length === 0 && (
         <Box p="xl" style={{ textAlign: 'center', border: '2px dashed #ccc', borderRadius: 8 }}>
           <Text c="dimmed" mb="md">No rows yet. Click "Add Row" to get started.</Text>
-          <Button onClick={handleAddRow} leftSection={<IconPlus size={14} />}>
+          <Button onClick={handleAddRow} leftSection={<IconRowInsertBottom size={14} />}>
             Add Your First Row
           </Button>
         </Box>
       )}
 
       {rows.length > 0 && (
-        <Box className="mt-1">
+        <Box className="mt-2 xtext-center">
           <Button
             size="compact-sm"
-            variant="light"
-            leftSection={<IconPlus size={14} />}
+            variant="subtle"
+            leftSection={<IconRowInsertBottom size={14} />}
             onClick={handleAddRow}
           >
             Add Section

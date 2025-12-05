@@ -26,4 +26,13 @@ trait announcements_api {
         return announcements_lib::get_sendas_options();
     }
 
+    /**
+     * Get audiences.
+     *
+     * @return array
+     */
+    static public function get_audiences() {
+        return announcements_lib::get_audiences();
+    }
+
 }

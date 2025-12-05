@@ -12,7 +12,7 @@ export function Header() {
   const checkAuthStatus = async () => {
     const response = await fetchData({
       query: {
-        methodname: 'local_activities-check_login',
+        methodname: 'local_announcements2-check_login',
       }
     })
     if (response.error && (response.exception?.errorcode === 'requireloginerror' || response.errorcode === 'requireloginerror')) {
