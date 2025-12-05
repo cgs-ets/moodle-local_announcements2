@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, memo, useRef } from 'react';
 import { Box, Button, ActionIcon, Menu, Textarea, Paper, Group, Text, Tabs } from '@mantine/core';
 import { IconGripVertical, IconPlus, IconTrash, IconCode, IconTable, IconFile, IconEdit, IconChevronLeft, IconChevronRight, IconGripHorizontal, IconCopy, IconDotsVertical, IconPhoto, IconColumnInsertRight, IconRowInsertBottom } from '@tabler/icons-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
@@ -90,7 +90,7 @@ type BlockComponentProps = {
   totalBlocks: number;
 }
 
-function BlockComponent({ 
+const BlockComponent = memo(function BlockComponent({ 
   block, 
   onUpdate, 
   onDelete, 
@@ -102,22 +102,36 @@ function BlockComponent({
   hasCopiedBlock = false,
   totalBlocks
 }: BlockComponentProps) {
+  // Use ref to track if update is from editor itself
+  const isEditorUpdateRef = useRef(false);
+  const lastContentRef = useRef(block.content);
+
+  const handleEditorUpdate = useCallback(({ editor }: { editor: any }) => {
+    isEditorUpdateRef.current = true;
+    const html = editor.getHTML();
+    if (html !== lastContentRef.current) {
+      lastContentRef.current = html;
+      onUpdate(block.id, html);
+    }
+    // Reset flag after a short delay to allow state updates
+    setTimeout(() => {
+      isEditorUpdateRef.current = false;
+    }, 0);
+  }, [block.id, onUpdate]);
+
   const editor = useEditor({
     extensions: [StarterKit],
     content: block.type === 'text' ? block.content : '',
-    onUpdate: ({ editor }) => {
-      const html = editor.getHTML();
-      if (html !== block.content) {
-        onUpdate(block.id, html);
-      }
-    },
+    onUpdate: handleEditorUpdate,
+    immediatelyRender: false,
   });
 
   // Update editor content when block content changes externally (but not from editor itself)
   useEffect(() => {
-    if (editor && block.type === 'text') {
+    if (editor && block.type === 'text' && !isEditorUpdateRef.current) {
       const currentContent = editor.getHTML();
       if (currentContent !== block.content) {
+        lastContentRef.current = block.content;
         editor.commands.setContent(block.content, { parseOptions: { preserveWhitespace: false } });
       }
     }
@@ -131,7 +145,38 @@ function BlockComponent({
     return [];
   }, [block.type, block.attachments]);
 
-  const renderBlockContent = () => {
+  // Memoize handlers to prevent re-renders
+  const handleCodeChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    onUpdate(block.id, e.target.value);
+  }, [block.id, onUpdate]);
+
+  const handleTableChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    onUpdate(block.id, e.target.value);
+  }, [block.id, onUpdate]);
+
+  const handleFileUpdate = useCallback((value: string) => {
+    onUpdate(block.id, '', value);
+  }, [block.id, onUpdate]);
+
+  // Memoize styles
+  const contentStyle = useMemo(() => ({ 
+    cursor: 'text' as const,
+    wordBreak: 'break-word' as const,
+    overflowWrap: 'break-word' as const,
+    overflow: 'hidden' as const
+  }), []);
+
+  const codeTextareaStyles = useMemo(() => ({
+    input: {
+      fontFamily: 'monospace',
+      border: 'none',
+    },
+  }), []);
+
+  const tableBoxStyle = useMemo(() => ({ border: '1px dashed #ccc', borderRadius: 4 }), []);
+  const previewStyle = useMemo(() => ({ padding: '16px' }), []);
+
+  const renderBlockContent = useMemo(() => {
     switch (block.type) {
       case 'text':
         if (!editor) {
@@ -158,14 +203,7 @@ function BlockComponent({
                 <RichTextEditor.Unlink />
               </RichTextEditor.ControlsGroup>
             </RichTextEditor.Toolbar>
-            <RichTextEditor.Content 
-              style={{ 
-                cursor: 'text',
-                wordBreak: 'break-word',
-                overflowWrap: 'break-word',
-                overflow: 'hidden'
-              }} 
-            />
+            <RichTextEditor.Content style={contentStyle} />
           </RichTextEditor>
         );
       case 'code':
@@ -178,39 +216,33 @@ function BlockComponent({
             <Tabs.Panel value="edit">
               <Textarea
                 value={block.content}
-                onChange={(e) => onUpdate(block.id, e.target.value)}
+                onChange={handleCodeChange}
                 placeholder="Enter code here..."
                 autosize
                 minRows={4}
-                styles={{
-                  input: {
-                    fontFamily: 'monospace',
-                    border: 'none',
-                  },
-                }}
+                styles={codeTextareaStyles}
               />
             </Tabs.Panel>
             <Tabs.Panel value="preview">
               <div 
                 dangerouslySetInnerHTML={{ __html: block.content || '' }} 
-                style={{ padding: '16px' }} 
+                style={previewStyle} 
               />
             </Tabs.Panel>
           </Tabs>
         );
       case 'table':
         return (
-          <Box p="md" style={{ border: '1px dashed #ccc', borderRadius: 4 }}>
+          <Box p="md" style={tableBoxStyle}>
             <Textarea
               value={block.content}
-              onChange={(e) => onUpdate(block.id, e.target.value)}
+              onChange={handleTableChange}
               placeholder="Table builder - Enter table HTML or markdown here..."
               minRows={5}
             />
           </Box>
         );
       case 'file':
-        // Use memoized existingFiles
         return (
           <FileUploader
             label="Upload image"
@@ -218,7 +250,7 @@ function BlockComponent({
             maxFiles={1}
             maxSize={10}
             existingfiles={existingFiles}
-            setState={(value) => onUpdate(block.id, '', value)}
+            setState={handleFileUpdate}
             showPreview={true}
             mimeTypes={IMAGE_MIME_TYPE}
           />
@@ -226,7 +258,7 @@ function BlockComponent({
       default:
         return null;
     }
-  };
+  }, [block.type, block.content, editor, existingFiles, handleCodeChange, handleTableChange, handleFileUpdate, contentStyle, codeTextareaStyles, tableBoxStyle, previewStyle]);
 
   return (
     <div className="relative" >
@@ -311,11 +343,21 @@ function BlockComponent({
         </Menu>
       </Group>
       <div className='border-b'>
-        {renderBlockContent()}
+        {renderBlockContent}
       </div>
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison function for React.memo
+  return (
+    prevProps.block.id === nextProps.block.id &&
+    prevProps.block.type === nextProps.block.type &&
+    prevProps.block.content === nextProps.block.content &&
+    prevProps.block.attachments === nextProps.block.attachments &&
+    prevProps.totalBlocks === nextProps.totalBlocks &&
+    prevProps.hasCopiedBlock === nextProps.hasCopiedBlock
+  );
+});
 
 // Row component
 type RowComponentProps = {
@@ -331,17 +373,17 @@ type RowComponentProps = {
   totalRows: number;
 }
 
-function RowComponent({ row, rowIndex, onUpdate, onDelete, onAddRow, dragHandleProps, copiedBlock, onCopy, onClearCopy, totalRows }: RowComponentProps) {
-  const handleBlockUpdate = (blockId: string, content: string, attachments?: string) => {
+const RowComponent = memo(function RowComponent({ row, rowIndex, onUpdate, onDelete, onAddRow, dragHandleProps, copiedBlock, onCopy, onClearCopy, totalRows }: RowComponentProps) {
+  const handleBlockUpdate = useCallback((blockId: string, content: string, attachments?: string) => {
     const updatedBlocks = row.blocks.map(block => 
       block.id === blockId 
         ? { ...block, content, attachments }
         : block
     );
     onUpdate(row.id, updatedBlocks);
-  };
+  }, [row.blocks, row.id, onUpdate]);
 
-  const handleBlockDelete = (blockId: string) => {
+  const handleBlockDelete = useCallback((blockId: string) => {
     const updatedBlocks = row.blocks.filter(block => block.id !== blockId);
     if (updatedBlocks.length === 0) {
       // If no blocks left, delete the row
@@ -349,9 +391,9 @@ function RowComponent({ row, rowIndex, onUpdate, onDelete, onAddRow, dragHandleP
     } else {
       onUpdate(row.id, updatedBlocks);
     }
-  };
+  }, [row.blocks, row.id, onDelete, onUpdate]);
 
-  const handleInsertLeft = (blockId: string) => {
+  const handleInsertLeft = useCallback((blockId: string) => {
     const blockIndex = row.blocks.findIndex(b => b.id === blockId);
     
     let blockToInsert: Block;
@@ -377,9 +419,9 @@ function RowComponent({ row, rowIndex, onUpdate, onDelete, onAddRow, dragHandleP
       ...row.blocks.slice(blockIndex)
     ];
     onUpdate(row.id, updatedBlocks);
-  };
+  }, [row.blocks, row.id, copiedBlock, onClearCopy, onUpdate]);
 
-  const handleInsertRight = (blockId: string) => {
+  const handleInsertRight = useCallback((blockId: string) => {
     const blockIndex = row.blocks.findIndex(b => b.id === blockId);
     
     let blockToInsert: Block;
@@ -405,18 +447,18 @@ function RowComponent({ row, rowIndex, onUpdate, onDelete, onAddRow, dragHandleP
       ...row.blocks.slice(blockIndex + 1)
     ];
     onUpdate(row.id, updatedBlocks);
-  };
+  }, [row.blocks, row.id, copiedBlock, onClearCopy, onUpdate]);
 
-  const handleTypeChange = (blockId: string, type: BlockType) => {
+  const handleTypeChange = useCallback((blockId: string, type: BlockType) => {
     const updatedBlocks = row.blocks.map(block => 
       block.id === blockId 
         ? { ...block, type, content: type === 'file' ? '' : block.content }
         : block
     );
     onUpdate(row.id, updatedBlocks);
-  };
+  }, [row.blocks, row.id, onUpdate]);
 
-  const handleBlockDragEnd = (result: DropResult) => {
+  const handleBlockDragEnd = useCallback((result: DropResult) => {
     if (!result.destination) return;
 
     const sourceIndex = result.source.index;
@@ -429,7 +471,7 @@ function RowComponent({ row, rowIndex, onUpdate, onDelete, onAddRow, dragHandleP
     newBlocks.splice(destinationIndex, 0, removed);
 
     onUpdate(row.id, newBlocks);
-  };
+  }, [row.blocks, row.id, onUpdate]);
 
   return (
     <div className={`flex gap-2 items-start -mt-[1px] -ml-7 -mr-8`}>
@@ -574,25 +616,47 @@ function RowComponent({ row, rowIndex, onUpdate, onDelete, onAddRow, dragHandleP
       </div>
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison function for React.memo
+  if (prevProps.row.id !== nextProps.row.id) return false;
+  if (prevProps.row.blocks.length !== nextProps.row.blocks.length) return false;
+  if (prevProps.totalRows !== nextProps.totalRows) return false;
+  if (prevProps.copiedBlock?.id !== nextProps.copiedBlock?.id) return false;
+  
+  // Deep compare blocks
+  for (let i = 0; i < prevProps.row.blocks.length; i++) {
+    const prevBlock = prevProps.row.blocks[i];
+    const nextBlock = nextProps.row.blocks[i];
+    if (
+      prevBlock.id !== nextBlock.id ||
+      prevBlock.type !== nextBlock.type ||
+      prevBlock.content !== nextBlock.content ||
+      prevBlock.attachments !== nextBlock.attachments
+    ) {
+      return false;
+    }
+  }
+  
+  return true;
+});
 
 // Main PageBuilder component
 export function PageBuilder({ rows, onChange }: PageBuilderProps) {
   const [copiedBlock, setCopiedBlock] = useState<Block | null>(null);
 
-  const handleRowUpdate = (rowId: string, blocks: Block[]) => {
+  const handleRowUpdate = useCallback((rowId: string, blocks: Block[]) => {
     const updatedRows = rows.map(row =>
       row.id === rowId ? { ...row, blocks } : row
     );
     onChange(updatedRows);
-  };
+  }, [rows, onChange]);
 
-  const handleRowDelete = (rowId: string) => {
+  const handleRowDelete = useCallback((rowId: string) => {
     const updatedRows = rows.filter(row => row.id !== rowId);
     onChange(updatedRows);
-  };
+  }, [rows, onChange]);
 
-  const handleAddRow = () => {
+  const handleAddRow = useCallback(() => {
     const newRow: Row = {
       id: generateId(),
       blocks: [{
@@ -602,17 +666,17 @@ export function PageBuilder({ rows, onChange }: PageBuilderProps) {
       }],
     };
     onChange([...rows, newRow]);
-  };
+  }, [rows, onChange]);
 
-  const handleCopyBlock = (block: Block) => {
+  const handleCopyBlock = useCallback((block: Block) => {
     setCopiedBlock(block);
-  };
+  }, []);
 
-  const handleClearCopy = () => {
+  const handleClearCopy = useCallback(() => {
     setCopiedBlock(null);
-  };
+  }, []);
 
-  const handleRowDragEnd = (result: DropResult) => {
+  const handleRowDragEnd = useCallback((result: DropResult) => {
     if (!result.destination) return;
 
     const sourceIndex = result.source.index;
@@ -625,7 +689,7 @@ export function PageBuilder({ rows, onChange }: PageBuilderProps) {
     newRows.splice(destinationIndex, 0, removed);
 
     onChange(newRows);
-  };
+  }, [rows, onChange]);
 
   return (
     <Box>
